@@ -1,0 +1,22 @@
+# Зависимости
+node_modules/
+
+# Временные файлы
+uploads/
+converted/
+
+# Логи
+*.log
+npm-debug.log*
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# PM2
+.pm2/
+
