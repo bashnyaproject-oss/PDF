@@ -1,0 +1,733 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Редактор - FileConvert</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #0f0f1a;
+            min-height: 100vh;
+            color: #fff;
+        }
+
+        /* Header */
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 25px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .logo {
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-decoration: none;
+        }
+        .header-actions { display: flex; gap: 10px; }
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+        }
+        .btn-outline:hover { background: rgba(255,255,255,0.05); }
+        .btn-primary {
+            background: linear-gradient(135deg, #6366f1, #a855f7);
+            color: #fff;
+        }
+        .btn-primary:hover { transform: translateY(-2px); }
+        .btn-success { background: #22c55e; color: #fff; }
+        .btn-success:hover { background: #16a34a; }
+
+        /* Main Layout */
+        .main {
+            display: flex;
+            height: calc(100vh - 65px);
+        }
+
+        /* Toolbar */
+        .toolbar {
+            width: 70px;
+            background: rgba(255,255,255,0.03);
+            border-right: 1px solid rgba(255,255,255,0.1);
+            padding: 15px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        .tool {
+            width: 50px;
+            height: 50px;
+            border: none;
+            background: transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 22px;
+            transition: all 0.2s;
+            color: #9ca3af;
+        }
+        .tool:hover { background: rgba(255,255,255,0.05); }
+        .tool.active { background: rgba(99,102,241,0.2); color: #6366f1; }
+        .tool-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 10px 0;
+        }
+
+        /* Canvas Area */
+        .canvas-area {
+            flex: 1;
+            overflow: auto;
+            padding: 30px;
+            display: flex;
+            justify-content: center;
+            background: #1a1a2e;
+        }
+        .pdf-container {
+            position: relative;
+            background: #fff;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.5);
+        }
+        #pdfCanvas { display: block; }
+        #overlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            cursor: crosshair;
+        }
+
+        /* Side Panel */
+        .side-panel {
+            width: 300px;
+            background: rgba(255,255,255,0.03);
+            border-left: 1px solid rgba(255,255,255,0.1);
+            padding: 20px;
+            display: none;
+        }
+        .side-panel.show { display: block; }
+        .panel-title {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Signature Pad */
+        .signature-pad {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        #signatureCanvas {
+            display: block;
+            cursor: crosshair;
+        }
+        .signature-actions {
+            display: flex;
+            gap: 10px;
+        }
+        .signature-actions .btn { flex: 1; }
+
+        /* Text Input */
+        .text-input-group { margin-bottom: 15px; }
+        .text-input-group label {
+            display: block;
+            font-size: 13px;
+            color: #9ca3af;
+            margin-bottom: 8px;
+        }
+        .text-input-group input,
+        .text-input-group textarea,
+        .text-input-group select {
+            width: 100%;
+            padding: 12px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 14px;
+        }
+        .text-input-group textarea { min-height: 100px; resize: vertical; }
+        .color-row {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .color-row input[type="color"] {
+            width: 50px;
+            height: 40px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        .color-row input[type="range"] { flex: 1; }
+
+        /* Drop Zone */
+        .drop-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            text-align: center;
+        }
+        .drop-zone .icon { font-size: 80px; margin-bottom: 20px; }
+        .drop-zone h2 { margin-bottom: 10px; }
+        .drop-zone p { color: #9ca3af; margin-bottom: 20px; }
+
+        /* Page Navigation */
+        .page-nav {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            background: rgba(0,0,0,0.8);
+            padding: 12px 25px;
+            border-radius: 30px;
+            backdrop-filter: blur(10px);
+        }
+        .page-nav button {
+            width: 36px;
+            height: 36px;
+            border: none;
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .page-nav button:hover { background: rgba(255,255,255,0.2); }
+        .page-nav span { font-size: 14px; }
+
+        /* Elements on PDF */
+        .pdf-element {
+            position: absolute;
+            cursor: move;
+            user-select: none;
+        }
+        .pdf-element:hover { outline: 2px solid #6366f1; }
+        .pdf-element.selected { outline: 2px solid #6366f1; }
+        .pdf-text {
+            padding: 5px 10px;
+            background: transparent;
+            min-width: 100px;
+        }
+        .pdf-text[contenteditable="true"] {
+            outline: 2px dashed #6366f1;
+            background: rgba(255,255,255,0.9);
+        }
+        .element-delete {
+            position: absolute;
+            top: -12px;
+            right: -12px;
+            width: 24px;
+            height: 24px;
+            background: #ef4444;
+            border: none;
+            border-radius: 50%;
+            color: #fff;
+            cursor: pointer;
+            font-size: 14px;
+            display: none;
+        }
+        .pdf-element:hover .element-delete,
+        .pdf-element.selected .element-delete { display: block; }
+
+        .file-input { display: none; }
+
+        /* Loading */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            z-index: 1000;
+        }
+        .loading-overlay.show { display: flex; }
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid rgba(255,255,255,0.1);
+            border-top-color: #6366f1;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <a href="/" class="logo">FileConvert</a>
+        <div class="header-actions">
+            <button class="btn btn-outline" onclick="openFile()">📂 Открыть PDF</button>
+            <button class="btn btn-success" onclick="savePdf()" id="saveBtn" disabled>💾 Сохранить</button>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="toolbar">
+            <button class="tool" title="Выбор" data-tool="select" onclick="setTool('select')">👆</button>
+            <button class="tool active" title="Текст" data-tool="text" onclick="setTool('text')">T</button>
+            <button class="tool" title="Подпись" data-tool="signature" onclick="setTool('signature')">✍️</button>
+            <div class="tool-divider"></div>
+            <button class="tool" title="Дата" onclick="addDate()">📅</button>
+            <button class="tool" title="Галочка" onclick="addCheckmark()">✓</button>
+        </div>
+
+        <div class="canvas-area" id="canvasArea">
+            <div class="drop-zone" id="dropZone">
+                <div class="icon">📄</div>
+                <h2>Перетащи PDF сюда</h2>
+                <p>или нажми кнопку "Открыть PDF"</p>
+                <button class="btn btn-primary" onclick="openFile()">Выбрать файл</button>
+            </div>
+            <div class="pdf-container" id="pdfContainer" style="display: none;">
+                <canvas id="pdfCanvas"></canvas>
+                <canvas id="overlayCanvas"></canvas>
+                <div id="elementsLayer"></div>
+            </div>
+        </div>
+
+        <div class="side-panel" id="sidePanel">
+            <!-- Text Panel -->
+            <div id="textPanel" style="display: none;">
+                <div class="panel-title">📝 Добавить текст</div>
+                <div class="text-input-group">
+                    <label>Текст</label>
+                    <textarea id="textContent" placeholder="Введите текст..."></textarea>
+                </div>
+                <div class="text-input-group">
+                    <label>Размер шрифта</label>
+                    <input type="range" id="fontSize" min="8" max="72" value="16">
+                    <span id="fontSizeValue">16px</span>
+                </div>
+                <div class="text-input-group">
+                    <label>Цвет</label>
+                    <input type="color" id="textColor" value="#000000">
+                </div>
+                <button class="btn btn-primary" style="width:100%" onclick="addTextElement()">Добавить на страницу</button>
+            </div>
+
+            <!-- Signature Panel -->
+            <div id="signaturePanel" style="display: none;">
+                <div class="panel-title">✍️ Подпись</div>
+                <div class="signature-pad">
+                    <canvas id="signatureCanvas" width="260" height="150"></canvas>
+                </div>
+                <div class="signature-actions">
+                    <button class="btn btn-outline" onclick="clearSignature()">Очистить</button>
+                    <button class="btn btn-primary" onclick="addSignature()">Добавить</button>
+                </div>
+                <div class="text-input-group" style="margin-top: 15px;">
+                    <label>Толщина линии</label>
+                    <input type="range" id="signatureWidth" min="1" max="5" value="2">
+                </div>
+                <div class="text-input-group">
+                    <label>Цвет</label>
+                    <input type="color" id="signatureColor" value="#000080">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="page-nav" id="pageNav" style="display: none;">
+        <button onclick="prevPage()">◀</button>
+        <span><span id="currentPage">1</span> / <span id="totalPages">1</span></span>
+        <button onclick="nextPage()">▶</button>
+    </div>
+
+    <div class="loading-overlay" id="loading">
+        <div class="spinner"></div>
+        <p>Сохранение PDF...</p>
+    </div>
+
+    <input type="file" class="file-input" id="fileInput" accept=".pdf">
+
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        let pdfDoc = null;
+        let pdfBytes = null;
+        let currentPage = 1;
+        let totalPages = 0;
+        let scale = 1.5;
+        let currentTool = 'text';
+        let elements = {}; // elements per page
+        let elementId = 0;
+
+        // Signature canvas
+        const sigCanvas = document.getElementById('signatureCanvas');
+        const sigCtx = sigCanvas.getContext('2d');
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+
+        sigCtx.fillStyle = '#fff';
+        sigCtx.fillRect(0, 0, sigCanvas.width, sigCanvas.height);
+        sigCtx.strokeStyle = '#000080';
+        sigCtx.lineWidth = 2;
+        sigCtx.lineCap = 'round';
+        sigCtx.lineJoin = 'round';
+
+        sigCanvas.addEventListener('mousedown', e => {
+            isDrawing = true;
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        });
+        sigCanvas.addEventListener('mousemove', e => {
+            if (!isDrawing) return;
+            sigCtx.strokeStyle = document.getElementById('signatureColor').value;
+            sigCtx.lineWidth = document.getElementById('signatureWidth').value;
+            sigCtx.beginPath();
+            sigCtx.moveTo(lastX, lastY);
+            sigCtx.lineTo(e.offsetX, e.offsetY);
+            sigCtx.stroke();
+            [lastX, lastY] = [e.offsetX, e.offsetY];
+        });
+        sigCanvas.addEventListener('mouseup', () => isDrawing = false);
+        sigCanvas.addEventListener('mouseout', () => isDrawing = false);
+
+        function clearSignature() {
+            sigCtx.fillStyle = '#fff';
+            sigCtx.fillRect(0, 0, sigCanvas.width, sigCanvas.height);
+        }
+
+        // Font size display
+        document.getElementById('fontSize').addEventListener('input', e => {
+            document.getElementById('fontSizeValue').textContent = e.target.value + 'px';
+        });
+
+        // Tool selection
+        function setTool(tool) {
+            currentTool = tool;
+            document.querySelectorAll('.tool').forEach(t => t.classList.remove('active'));
+            document.querySelector(`[data-tool="${tool}"]`)?.classList.add('active');
+
+            const sidePanel = document.getElementById('sidePanel');
+            const textPanel = document.getElementById('textPanel');
+            const signaturePanel = document.getElementById('signaturePanel');
+
+            textPanel.style.display = 'none';
+            signaturePanel.style.display = 'none';
+
+            if (tool === 'text') {
+                sidePanel.classList.add('show');
+                textPanel.style.display = 'block';
+            } else if (tool === 'signature') {
+                sidePanel.classList.add('show');
+                signaturePanel.style.display = 'block';
+            } else {
+                sidePanel.classList.remove('show');
+            }
+        }
+
+        // File handling
+        function openFile() {
+            document.getElementById('fileInput').click();
+        }
+
+        document.getElementById('fileInput').addEventListener('change', e => {
+            const file = e.target.files[0];
+            if (file) loadPdf(file);
+        });
+
+        // Drag and drop
+        const canvasArea = document.getElementById('canvasArea');
+        canvasArea.addEventListener('dragover', e => e.preventDefault());
+        canvasArea.addEventListener('drop', e => {
+            e.preventDefault();
+            const file = e.dataTransfer.files[0];
+            if (file && file.type === 'application/pdf') loadPdf(file);
+        });
+
+        async function loadPdf(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            pdfBytes = new Uint8Array(arrayBuffer);
+            
+            pdfDoc = await pdfjsLib.getDocument(arrayBuffer).promise;
+            totalPages = pdfDoc.numPages;
+            currentPage = 1;
+            elements = {};
+
+            document.getElementById('dropZone').style.display = 'none';
+            document.getElementById('pdfContainer').style.display = 'block';
+            document.getElementById('pageNav').style.display = 'flex';
+            document.getElementById('saveBtn').disabled = false;
+            document.getElementById('totalPages').textContent = totalPages;
+
+            setTool('text');
+            renderPage(currentPage);
+        }
+
+        async function renderPage(num) {
+            const page = await pdfDoc.getPage(num);
+            const viewport = page.getViewport({ scale });
+
+            const pdfCanvas = document.getElementById('pdfCanvas');
+            const overlayCanvas = document.getElementById('overlayCanvas');
+            const ctx = pdfCanvas.getContext('2d');
+
+            pdfCanvas.width = viewport.width;
+            pdfCanvas.height = viewport.height;
+            overlayCanvas.width = viewport.width;
+            overlayCanvas.height = viewport.height;
+
+            await page.render({ canvasContext: ctx, viewport }).promise;
+
+            document.getElementById('currentPage').textContent = num;
+            renderElements();
+        }
+
+        function renderElements() {
+            const layer = document.getElementById('elementsLayer');
+            layer.innerHTML = '';
+
+            const pageElements = elements[currentPage] || [];
+            pageElements.forEach(el => {
+                const div = document.createElement('div');
+                div.className = 'pdf-element';
+                div.style.left = el.x + 'px';
+                div.style.top = el.y + 'px';
+                div.dataset.id = el.id;
+
+                if (el.type === 'text') {
+                    div.className += ' pdf-text';
+                    div.style.fontSize = el.fontSize + 'px';
+                    div.style.color = el.color;
+                    div.textContent = el.content;
+                    div.contentEditable = true;
+                    div.addEventListener('blur', () => {
+                        el.content = div.textContent;
+                    });
+                } else if (el.type === 'signature' || el.type === 'image') {
+                    const img = document.createElement('img');
+                    img.src = el.data;
+                    img.style.maxWidth = '200px';
+                    img.draggable = false;
+                    div.appendChild(img);
+                }
+
+                // Delete button
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'element-delete';
+                deleteBtn.textContent = '×';
+                deleteBtn.onclick = () => {
+                    elements[currentPage] = elements[currentPage].filter(e => e.id !== el.id);
+                    renderElements();
+                };
+                div.appendChild(deleteBtn);
+
+                // Dragging
+                makeDraggable(div, el);
+
+                layer.appendChild(div);
+            });
+        }
+
+        function makeDraggable(el, data) {
+            let isDragging = false;
+            let startX, startY, origX, origY;
+
+            el.addEventListener('mousedown', e => {
+                if (e.target.tagName === 'BUTTON') return;
+                isDragging = true;
+                startX = e.clientX;
+                startY = e.clientY;
+                origX = data.x;
+                origY = data.y;
+                el.classList.add('selected');
+            });
+
+            document.addEventListener('mousemove', e => {
+                if (!isDragging) return;
+                const dx = e.clientX - startX;
+                const dy = e.clientY - startY;
+                data.x = origX + dx;
+                data.y = origY + dy;
+                el.style.left = data.x + 'px';
+                el.style.top = data.y + 'px';
+            });
+
+            document.addEventListener('mouseup', () => {
+                isDragging = false;
+            });
+        }
+
+        // Add text
+        function addTextElement() {
+            const content = document.getElementById('textContent').value;
+            if (!content.trim()) return;
+
+            if (!elements[currentPage]) elements[currentPage] = [];
+            elements[currentPage].push({
+                id: ++elementId,
+                type: 'text',
+                content: content,
+                x: 100,
+                y: 100,
+                fontSize: parseInt(document.getElementById('fontSize').value),
+                color: document.getElementById('textColor').value
+            });
+
+            document.getElementById('textContent').value = '';
+            renderElements();
+        }
+
+        // Add signature
+        function addSignature() {
+            const data = sigCanvas.toDataURL('image/png');
+            
+            if (!elements[currentPage]) elements[currentPage] = [];
+            elements[currentPage].push({
+                id: ++elementId,
+                type: 'signature',
+                data: data,
+                x: 100,
+                y: 100
+            });
+
+            clearSignature();
+            renderElements();
+        }
+
+        // Add date
+        function addDate() {
+            const today = new Date().toLocaleDateString('ru-RU');
+            if (!elements[currentPage]) elements[currentPage] = [];
+            elements[currentPage].push({
+                id: ++elementId,
+                type: 'text',
+                content: today,
+                x: 100,
+                y: 100,
+                fontSize: 14,
+                color: '#000000'
+            });
+            renderElements();
+        }
+
+        // Add checkmark
+        function addCheckmark() {
+            if (!elements[currentPage]) elements[currentPage] = [];
+            elements[currentPage].push({
+                id: ++elementId,
+                type: 'text',
+                content: '✓',
+                x: 100,
+                y: 100,
+                fontSize: 24,
+                color: '#22c55e'
+            });
+            renderElements();
+        }
+
+        // Page navigation
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderPage(currentPage);
+            }
+        }
+
+        function nextPage() {
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderPage(currentPage);
+            }
+        }
+
+        // Save PDF
+        async function savePdf() {
+            const loading = document.getElementById('loading');
+            loading.classList.add('show');
+
+            try {
+                const { PDFDocument, rgb, StandardFonts } = PDFLib;
+                const pdfDocLib = await PDFDocument.load(pdfBytes);
+                const pages = pdfDocLib.getPages();
+                const font = await pdfDocLib.embedFont(StandardFonts.Helvetica);
+
+                for (const [pageNum, pageElements] of Object.entries(elements)) {
+                    const page = pages[parseInt(pageNum) - 1];
+                    const { height } = page.getSize();
+
+                    for (const el of pageElements) {
+                        if (el.type === 'text') {
+                            const color = hexToRgb(el.color);
+                            page.drawText(el.content, {
+                                x: el.x / scale,
+                                y: height - (el.y / scale) - (el.fontSize / scale),
+                                size: el.fontSize / scale,
+                                font: font,
+                                color: rgb(color.r / 255, color.g / 255, color.b / 255)
+                            });
+                        } else if (el.type === 'signature') {
+                            const pngImage = await pdfDocLib.embedPng(el.data);
+                            const dims = pngImage.scale(0.5 / scale);
+                            page.drawImage(pngImage, {
+                                x: el.x / scale,
+                                y: height - (el.y / scale) - dims.height,
+                                width: dims.width,
+                                height: dims.height
+                            });
+                        }
+                    }
+                }
+
+                const modifiedPdfBytes = await pdfDocLib.save();
+                const blob = new Blob([modifiedPdfBytes], { type: 'application/pdf' });
+                const url = URL.createObjectURL(blob);
+                
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'edited-document.pdf';
+                a.click();
+
+                URL.revokeObjectURL(url);
+            } catch (err) {
+                alert('Ошибка сохранения: ' + err.message);
+            }
+
+            loading.classList.remove('show');
+        }
+
+        function hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? {
+                r: parseInt(result[1], 16),
+                g: parseInt(result[2], 16),
+                b: parseInt(result[3], 16)
+            } : { r: 0, g: 0, b: 0 };
+        }
+
+        // Initial tool
+        setTool('text');
+    </script>
+</body>
+</html>
+
